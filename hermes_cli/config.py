@@ -1564,10 +1564,46 @@ def _env_expand_match(m: re.Match) -> str:
     if val is not None:
         return val
     if inner.startswith("env:"):
-        logger.warning(
-            "Config ref %r: %s is not set (check ~/.hermes/.env); "
-            "keeping the literal placeholder", raw, name)
+        # A routed profile scope withholds launch credentials by design
+        # (#84079). The warning text points at a file that already has the
+        # key, so that case is not a WARNING. Resolution is unchanged.
+        if _routed_scope_withholds_launch_key(name):
+            logger.debug(
+                "Config ref %r: %s withheld by a routed profile scope "
+                "(defined in the launch .env); keeping the literal",
+                raw, name)
+        else:
+            logger.warning(
+                "Config ref %r: %s is not set (check ~/.hermes/.env); "
+                "keeping the literal placeholder", raw, name)
     return raw
+
+
+def _routed_scope_withholds_launch_key(name: str) -> bool:
+    """True when a foreign profile scope withheld a launch-dotenv key.
+
+    The miss is by design (#84079): a served profile must not inherit the
+    launch process environment. Fail toward the existing warning when the
+    home is unstamped, is the launch home, or the key is not in the launch
+    dotenv. An import failure must not turn a config read into an exception.
+    """
+    try:
+        from agent.secret_scope import current_secret_scope_home
+        from hermes_constants import (
+            get_routing_process_hermes_home,
+            hermes_home_key,
+        )
+        from hermes_cli.env_loader import launch_dotenv_keys
+
+        home = current_secret_scope_home()
+        if not home:
+            return False
+        launch = get_routing_process_hermes_home()
+        if hermes_home_key(home) == hermes_home_key(launch):
+            return False
+        return name in launch_dotenv_keys()
+    except Exception:
+        return False
 
 
 def _is_non_env_secret_ref(ref: str) -> bool:
