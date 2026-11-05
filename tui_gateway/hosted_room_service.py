@@ -83,7 +83,11 @@ def _discussion_limits(root: Path) -> discussion.DiscussionLimits:
             raise discussion.DiscussionValidationError("hosted_rooms.discussion must be a mapping")
         return discussion.DiscussionLimits(
             max_rounds=settings.get("max_rounds", discussion.MAX_DISCUSSION_ROUNDS),
-            max_messages=settings.get("max_messages", discussion.MAX_DISCUSSION_MESSAGES))
+            max_messages=settings.get("max_messages", discussion.MAX_DISCUSSION_MESSAGES),
+            adaptive=bool(settings.get("adaptive", False)),
+            messages_per_member_round=settings.get("messages_per_member_round", 1),
+            buffer_messages=settings.get("buffer_messages", 2),
+            max_messages_ceiling=settings.get("max_messages_ceiling", 50))
     except discussion.DiscussionValidationError as exc:
         logger.warning("ignoring hosted_rooms.discussion in %s/config.yaml: %s", root, exc)
         return discussion.DiscussionLimits()

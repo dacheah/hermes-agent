@@ -101,10 +101,32 @@ class DiscussionLimits:
 
     max_rounds: int = MAX_DISCUSSION_ROUNDS
     max_messages: int = MAX_DISCUSSION_MESSAGES
+    adaptive: bool = False
+    messages_per_member_round: int = 1
+    buffer_messages: int = 2
+    max_messages_ceiling: int = 50
 
     def __post_init__(self) -> None:
         _positive_int(self.max_rounds, label="hosted_rooms.discussion.max_rounds")
         _positive_int(self.max_messages, label="hosted_rooms.discussion.max_messages")
+        _positive_int(self.messages_per_member_round, label="hosted_rooms.discussion.messages_per_member_round")
+        _bounded_int(self.buffer_messages, message="hosted_rooms.discussion.buffer_messages must be a non-negative integer", low=0)
+        _positive_int(self.max_messages_ceiling, label="hosted_rooms.discussion.max_messages_ceiling")
+
+    def effective_for(self, room: Any) -> DiscussionLimits:
+        """Derive effective limits scaled to room roster size if adaptive scaling is active."""
+        if not self.adaptive or not getattr(room, "members", None):
+            return self
+        roster_size = len(room.members)
+        scaled_messages = (self.max_rounds * roster_size * self.messages_per_member_round) + self.buffer_messages
+        effective_messages = min(self.max_messages_ceiling, min(self.max_messages, scaled_messages))
+        return DiscussionLimits(
+            max_rounds=self.max_rounds,
+            max_messages=effective_messages,
+            adaptive=self.adaptive,
+            messages_per_member_round=self.messages_per_member_round,
+            buffer_messages=self.buffer_messages,
+            max_messages_ceiling=self.max_messages_ceiling)
 
 
 @dataclass(frozen=True)
@@ -801,6 +823,7 @@ def plan_next_task(
     """Replay the complete room log and return at most one next member task. ``room_context`` is the
     room settings in force when the pending discussion opened (``hosted_room_context.room_context``)."""
     room = validate_room(room_value, local_profiles=local_profiles)
+    limits = limits.effective_for(room)
     try:
         context = validate_context(**{key: str((room_context or {}).get(key) or default) for key, default in (
             ("purpose", ""), ("notes", ""), ("routing", "everyone"), ("lead_member_id", ""))})
