@@ -190,11 +190,22 @@ class GatewayTurnPrepareMixin:
                 if ch.model:
                     model = ch.model
                 if ch.provider:
-                    runtime_kwargs = _resolve_runtime_agent_kwargs_for_provider(ch.provider, target_model=model or None)
-                    ch_runtime_model = runtime_kwargs.pop("model", None)
-                    # Adopt the provider's bundled model only when the override named none.
-                    if ch_runtime_model and not ch.model:
-                        model = ch_runtime_model
+                    try:
+                        runtime_kwargs = _resolve_runtime_agent_kwargs_for_provider(ch.provider, target_model=model or None)
+                        ch_runtime_model = runtime_kwargs.pop("model", None)
+                        # Adopt the provider's bundled model only when the override named none.
+                        if ch_runtime_model and not ch.model:
+                            model = ch_runtime_model
+                    except Exception as exc:
+                        logger.warning(
+                            "Channel override provider %s unavailable for channel %s: %s; falling back to global provider",
+                            ch.provider, source.chat_id, exc,
+                        )
+                        # Fall back model and runtime together: keeping ch.model
+                        # with global runtime_kwargs would pair an override model
+                        # with a disparate global provider endpoint.
+                        model = _resolve_gateway_model(cfg)
+                        runtime_kwargs = _resolve_runtime_agent_kwargs()
 
         if override and skey:
             model, runtime_kwargs = self._apply_session_model_override(skey, model, runtime_kwargs)
