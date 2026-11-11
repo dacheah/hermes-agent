@@ -1,6 +1,6 @@
 name: live-video
 repo: https://github.com/dacheah/hermes-live-video
-sha: e27eb4def76a13fdbf9af12e7f111575477a7621
+sha: c7bdeb63cbdd52351a1b32947974fc08aa0cf9f2
 subdir: plugin
 description: >-
   Give Hermes eyes in a live voice conversation. Open a page on your phone, talk, and the
